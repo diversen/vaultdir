@@ -92,6 +92,24 @@ class VaultDirTests(unittest.TestCase):
             self.assertTrue((base / "input").is_dir())
             self.assertIn("Extracted to", stdout.getvalue())
 
+    def test_cli_encrypt_ctrl_c_during_password_prompt_returns_clean_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source = base / "input"
+            source.mkdir()
+            (source / "file.txt").write_text("secret\n", encoding="utf-8")
+
+            stderr = io.StringIO()
+            with (
+                patch("sys.argv", ["vaultdir", str(source)]),
+                patch("sys.stderr", stderr),
+                patch("main.getpass.getpass", side_effect=KeyboardInterrupt),
+            ):
+                exit_code = main()
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stderr.getvalue().strip(), "Error: aborted")
+
     def test_decrypt_output_path_is_exact_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)

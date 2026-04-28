@@ -75,11 +75,17 @@ def derive_key(password: str, salt: bytes, n: int, r: int, p: int) -> bytes:
 
 
 def prompt_password(confirm: bool) -> str:
-    password = getpass.getpass("Password: ")
+    try:
+        password = getpass.getpass("Password: ")
+    except KeyboardInterrupt as exc:
+        raise VaultDirError("aborted") from exc
     if not password:
         raise VaultDirError("password cannot be empty")
     if confirm:
-        repeated = getpass.getpass("Confirm password: ")
+        try:
+            repeated = getpass.getpass("Confirm password: ")
+        except KeyboardInterrupt as exc:
+            raise VaultDirError("aborted") from exc
         if password != repeated:
             raise VaultDirError("passwords did not match")
     return password
