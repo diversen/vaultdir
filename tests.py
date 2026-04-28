@@ -48,6 +48,50 @@ class VaultDirTests(unittest.TestCase):
                 "nested\n",
             )
 
+    def test_cli_encrypt_dispatches_from_directory_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source = base / "input"
+            source.mkdir()
+            (source / "file.txt").write_text("secret\n", encoding="utf-8")
+
+            stdout = io.StringIO()
+            with (
+                patch("sys.argv", ["vaultdir", str(source)]),
+                patch("sys.stdout", stdout),
+                patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]),
+            ):
+                exit_code = main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((base / "input.vault").is_file())
+            self.assertIn("Created", stdout.getvalue())
+
+    def test_cli_decrypt_dispatches_from_file_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source = base / "input"
+            source.mkdir()
+            (source / "file.txt").write_text("secret\n", encoding="utf-8")
+            vault_path = base / "input.vault"
+
+            with patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]):
+                encrypt_directory(source, vault_path, force=False)
+
+            source.rename(base / "input.original")
+
+            stdout = io.StringIO()
+            with (
+                patch("sys.argv", ["vaultdir", str(vault_path)]),
+                patch("sys.stdout", stdout),
+                patch("main.getpass.getpass", return_value="testpass123"),
+            ):
+                exit_code = main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((base / "input").is_dir())
+            self.assertIn("Extracted to", stdout.getvalue())
+
     def test_decrypt_output_path_is_exact_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)

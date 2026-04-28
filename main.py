@@ -89,6 +89,31 @@ def default_encrypt_output(directory: Path) -> Path:
     return directory.parent / f"{directory.name}.vault"
 
 
+def read_vault_header(vault_file: Path) -> tuple[int, int, int, bytes, bytes, int]:
+    minimum_size = HEADER_STRUCT.size + SALT_SIZE + NONCE_SIZE + TAG_SIZE
+    file_size = vault_file.stat().st_size
+    if file_size < minimum_size:
+        raise VaultDirError("vault file is too small")
+
+    with vault_file.open("rb") as raw_file:
+        header = raw_file.read(HEADER_STRUCT.size)
+        if len(header) != HEADER_STRUCT.size:
+            raise VaultDirError("vault file is truncated")
+        magic, version, n, r, p = HEADER_STRUCT.unpack(header)
+        if magic != MAGIC:
+            raise VaultDirError("file is not a vaultdir archive")
+        if version != VERSION:
+            raise VaultDirError(f"unsupported vault version: {version}")
+
+        salt = raw_file.read(SALT_SIZE)
+        nonce = raw_file.read(NONCE_SIZE)
+        if len(salt) != SALT_SIZE or len(nonce) != NONCE_SIZE:
+            raise VaultDirError("vault file is truncated")
+
+    ciphertext_length = file_size - HEADER_STRUCT.size - SALT_SIZE - NONCE_SIZE - TAG_SIZE
+    return n, r, p, salt, nonce, ciphertext_length
+
+
 def get_program_version() -> str:
     try:
         return importlib.metadata.version("vaultdir")
@@ -184,10 +209,7 @@ def encrypt_directory(source_dir: Path, output_file: Path, force: bool) -> None:
 def decrypt_vault(vault_file: Path, output_dir: Path | None, force: bool) -> Path:
     if not vault_file.is_file():
         raise VaultDirError(f"not a file: {vault_file}")
-    minimum_size = HEADER_STRUCT.size + SALT_SIZE + NONCE_SIZE + TAG_SIZE
-    file_size = vault_file.stat().st_size
-    if file_size < minimum_size:
-        raise VaultDirError("vault file is too small")
+    n, r, p, salt, nonce, ciphertext_length = read_vault_header(vault_file)
     password = prompt_password(confirm=False)
     temp_parent = output_dir.parent if output_dir else vault_file.parent
     temp_output = Path(
@@ -195,20 +217,9 @@ def decrypt_vault(vault_file: Path, output_dir: Path | None, force: bool) -> Pat
     )
     try:
         with vault_file.open("rb") as raw_file:
-            header = raw_file.read(HEADER_STRUCT.size)
-            magic, version, n, r, p = HEADER_STRUCT.unpack(header)
-            if magic != MAGIC:
-                raise VaultDirError("file is not a vaultdir archive")
-            if version != VERSION:
-                raise VaultDirError(f"unsupported vault version: {version}")
-
-            salt = raw_file.read(SALT_SIZE)
-            nonce = raw_file.read(NONCE_SIZE)
-            if len(salt) != SALT_SIZE or len(nonce) != NONCE_SIZE:
-                raise VaultDirError("vault file is truncated")
+            raw_file.seek(HEADER_STRUCT.size + SALT_SIZE + NONCE_SIZE)
 
             key = derive_key(password, salt, n, r, p)
-            ciphertext_length = file_size - HEADER_STRUCT.size - SALT_SIZE - NONCE_SIZE - TAG_SIZE
             cipher = Cipher(algorithms.AES(key), modes.GCM(nonce))
             decryptor = cipher.decryptor()
             reader = DecryptingReader(raw_file, decryptor, ciphertext_length)
@@ -244,29 +255,16 @@ def decrypt_vault(vault_file: Path, output_dir: Path | None, force: bool) -> Pat
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="vaultdir",
-        description="Encrypt or decrypt a directory into a password-protected vault file.",
+        description="Encrypt a directory or decrypt a vault file, based on the source path.",
     )
     parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {get_program_version()}",
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    encrypt_parser = subparsers.add_parser("encrypt", help="encrypt a directory")
-    encrypt_parser.add_argument("source", type=Path, help="directory to encrypt")
-    encrypt_parser.add_argument("-o", "--output", type=Path, help="output vault file")
-    encrypt_parser.add_argument(
-        "-f", "--force", action="store_true", help="overwrite an existing output file"
-    )
-
-    decrypt_parser = subparsers.add_parser("decrypt", help="decrypt a vault file")
-    decrypt_parser.add_argument("source", type=Path, help="vault file to decrypt")
-    decrypt_parser.add_argument("-o", "--output", type=Path, help="output directory")
-    decrypt_parser.add_argument(
-        "-f", "--force", action="store_true", help="overwrite an existing output path"
-    )
-
+    parser.add_argument("source", type=Path, help="directory to encrypt or vault file to decrypt")
+    parser.add_argument("-o", "--output", type=Path, help="output file or directory")
+    parser.add_argument("-f", "--force", action="store_true", help="overwrite an existing output path")
     return parser
 
 
@@ -275,11 +273,13 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        if args.command == "encrypt":
+        if args.source.is_dir():
             output = args.output if args.output else default_encrypt_output(args.source)
             encrypt_directory(args.source, output, args.force)
             print(f"Created {output}")
         else:
+            if not args.source.is_file():
+                raise VaultDirError(f"source does not exist or is unsupported: {args.source}")
             output = decrypt_vault(args.source, args.output, args.force)
             print(f"Extracted to {output}")
     except VaultDirError as exc:
