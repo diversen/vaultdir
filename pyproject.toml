@@ -1,6 +1,6 @@
 [project]
 name = "vaultdir"
-version = "0.0.3"
+version = "0.0.4"
 description = "Encrypt and decrypt directories with a password"
 readme = "README.md"
 requires-python = ">=3.12"
