@@ -89,12 +89,6 @@ def default_encrypt_output(directory: Path) -> Path:
     return directory.parent / f"{directory.name}.vault"
 
 
-def default_decrypt_output(vault_file: Path) -> Path:
-    if vault_file.suffix == ".vault":
-        return vault_file.with_suffix("")
-    return vault_file.parent / f"{vault_file.name}.out"
-
-
 def get_program_version() -> str:
     try:
         return importlib.metadata.version("vaultdir")
@@ -131,7 +125,7 @@ def validate_tar_member(member: tarfile.TarInfo, output_dir: Path) -> None:
         raise VaultDirError(f"archive escapes output directory: {member.name}")
 
 
-def extract_streaming_tar(archive: tarfile.TarFile, output_dir: Path) -> None:
+def extract_streaming_tar(archive: tarfile.TarFile, output_dir: Path) -> str:
     root_name = None
     for member in archive:
         validate_tar_member(member, output_dir)
@@ -157,6 +151,7 @@ def extract_streaming_tar(archive: tarfile.TarFile, output_dir: Path) -> None:
 
     if root_name is None:
         raise VaultDirError("archive is empty")
+    return root_name
 
 
 def encrypt_directory(source_dir: Path, output_file: Path, force: bool) -> None:
@@ -181,18 +176,17 @@ def encrypt_directory(source_dir: Path, output_file: Path, force: bool) -> None:
         raw_file.write(encryptor.tag)
 
 
-def decrypt_vault(vault_file: Path, output_dir: Path, force: bool) -> None:
+def decrypt_vault(vault_file: Path, output_dir: Path | None, force: bool) -> Path:
     if not vault_file.is_file():
         raise VaultDirError(f"not a file: {vault_file}")
-    ensure_output_path(output_dir, force)
     minimum_size = HEADER_STRUCT.size + SALT_SIZE + NONCE_SIZE + TAG_SIZE
     file_size = vault_file.stat().st_size
     if file_size < minimum_size:
         raise VaultDirError("vault file is too small")
     password = prompt_password(confirm=False)
-    temp_parent = output_dir.parent
+    temp_parent = output_dir.parent if output_dir else vault_file.parent
     temp_output = Path(
-        tempfile.mkdtemp(prefix=f".{output_dir.name}.tmp.", dir=str(temp_parent))
+        tempfile.mkdtemp(prefix=f".{vault_file.stem}.tmp.", dir=str(temp_parent))
     )
     try:
         with vault_file.open("rb") as raw_file:
@@ -215,13 +209,19 @@ def decrypt_vault(vault_file: Path, output_dir: Path, force: bool) -> None:
             reader = DecryptingReader(raw_file, decryptor, ciphertext_length)
 
             with tarfile.open(fileobj=reader, mode="r|") as archive:
-                extract_streaming_tar(archive, temp_output)
+                root_name = extract_streaming_tar(archive, temp_output)
 
             tag = raw_file.read(TAG_SIZE)
             if len(tag) != TAG_SIZE:
                 raise VaultDirError("vault file is truncated")
             decryptor.finalize_with_tag(tag)
-        temp_output.replace(output_dir)
+
+        extracted_root = temp_output / root_name
+        final_output = output_dir if output_dir else vault_file.parent / root_name
+        ensure_output_path(final_output, force)
+        extracted_root.replace(final_output)
+        shutil.rmtree(temp_output)
+        return final_output
     except InvalidTag as exc:
         if temp_output.exists():
             shutil.rmtree(temp_output)
@@ -275,8 +275,7 @@ def main() -> int:
             encrypt_directory(args.source, output, args.force)
             print(f"Created {output}")
         else:
-            output = args.output if args.output else default_decrypt_output(args.source)
-            decrypt_vault(args.source, output, args.force)
+            output = decrypt_vault(args.source, args.output, args.force)
             print(f"Extracted to {output}")
     except VaultDirError as exc:
         print(f"Error: {exc}", file=sys.stderr)

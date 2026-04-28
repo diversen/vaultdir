@@ -24,7 +24,8 @@ Decrypt a vault:
 vaultdir decrypt some-dir.vault
 ```
 
-This restores `some-dir` in the current directory.
+This restores the archived directory in the current directory. For example,
+`some-dir.vault` created from `some-dir` restores to `./some-dir`.
 
 ## Options
 
@@ -34,6 +35,9 @@ vaultdir encrypt some-dir -o backup.vault
 vaultdir decrypt backup.vault -o restored-dir
 vaultdir decrypt backup.vault -o restored-dir --force
 ```
+
+When `-o restored-dir` is used with `decrypt`, the archive is restored directly into
+`restored-dir`.
 
 ## Notes
 

@@ -123,7 +123,7 @@ wheels = [
 
 [[package]]
 name = "vaultdir"
-version = "0.1.0"
+version = "0.0.2"
 source = { virtual = "." }
 dependencies = [
     { name = "cryptography" },
