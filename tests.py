@@ -1,10 +1,11 @@
 import io
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from main import VaultDirError, decrypt_vault, encrypt_directory, main
+from main import VaultDirError, decrypt_vault, encrypt_directory, get_program_version, main
 
 
 class VaultDirTests(unittest.TestCase):
@@ -18,7 +19,7 @@ class VaultDirTests(unittest.TestCase):
                 main()
 
         self.assertEqual(exc.exception.code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "vaultdir 0.0.2")
+        self.assertEqual(stdout.getvalue().strip(), f"vaultdir {get_program_version()}")
 
     def test_encrypt_decrypt_round_trip_uses_archived_name_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -82,6 +83,49 @@ class VaultDirTests(unittest.TestCase):
             with patch("main.getpass.getpass", return_value="wrongpass"):
                 with self.assertRaises(VaultDirError):
                     decrypt_vault(vault_path, output_dir, force=False)
+
+    def test_decrypt_preserves_file_mode_bits(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source = base / "input"
+            source.mkdir()
+            script = source / "script.sh"
+            script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            os.chmod(script, 0o750)
+
+            vault_path = base / "input.vault"
+
+            with patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]):
+                encrypt_directory(source, vault_path, force=False)
+
+            source.rename(base / "input.original")
+
+            with patch("main.getpass.getpass", return_value="testpass123"):
+                restored = decrypt_vault(vault_path, None, force=False)
+
+            self.assertEqual((restored / "script.sh").stat().st_mode & 0o777, 0o750)
+
+    def test_decrypt_preserves_directory_mode_bits(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source = base / "input"
+            source.mkdir()
+            private_dir = source / "private"
+            private_dir.mkdir()
+            os.chmod(private_dir, 0o700)
+            (private_dir / "secret.txt").write_text("secret\n", encoding="utf-8")
+
+            vault_path = base / "input.vault"
+
+            with patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]):
+                encrypt_directory(source, vault_path, force=False)
+
+            source.rename(base / "input.original")
+
+            with patch("main.getpass.getpass", return_value="testpass123"):
+                restored = decrypt_vault(vault_path, None, force=False)
+
+            self.assertEqual((restored / "private").stat().st_mode & 0o777, 0o700)
 
 
 if __name__ == "__main__":

@@ -127,6 +127,7 @@ def validate_tar_member(member: tarfile.TarInfo, output_dir: Path) -> None:
 
 def extract_streaming_tar(archive: tarfile.TarFile, output_dir: Path) -> str:
     root_name = None
+    directory_modes: list[tuple[Path, int]] = []
     for member in archive:
         validate_tar_member(member, output_dir)
         member_root = PurePosixPath(member.name).parts[0]
@@ -138,6 +139,7 @@ def extract_streaming_tar(archive: tarfile.TarFile, output_dir: Path) -> str:
         destination = output_dir / Path(*PurePosixPath(member.name).parts)
         if member.isdir():
             destination.mkdir(parents=True, exist_ok=True)
+            directory_modes.append((destination, member.mode))
             continue
         if not member.isfile():
             raise VaultDirError(f"archive contains unsupported member: {member.name}")
@@ -148,9 +150,12 @@ def extract_streaming_tar(archive: tarfile.TarFile, output_dir: Path) -> str:
             raise VaultDirError(f"failed to read archived file: {member.name}")
         with extracted, destination.open("wb") as handle:
             shutil.copyfileobj(extracted, handle)
+        os.chmod(destination, member.mode)
 
     if root_name is None:
         raise VaultDirError("archive is empty")
+    for directory, mode in reversed(directory_modes):
+        os.chmod(directory, mode)
     return root_name
 
 
