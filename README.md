@@ -14,7 +14,6 @@ uv tool install git+https://github.com/diversen/vaultdir.git
 uv tool install --upgrade git+https://github.com/diversen/vaultdir.git
 ```
 
-
 ## Usage
 
 Encrypt a directory:
@@ -23,7 +22,7 @@ Encrypt a directory:
 vaultdir some-dir
 ```
 
-This creates `some-dir.vault`.
+This creates `./some-dir.vault` in the current working directory.
 
 Decrypt a vault:
 
@@ -37,7 +36,6 @@ This restores the archived directory in the current directory. For example,
 ## Options
 
 ```bash
-vaultdir --version
 vaultdir some-dir -o backup.vault
 vaultdir backup.vault -o restored-dir
 vaultdir backup.vault -o restored-dir --force

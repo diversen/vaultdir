@@ -25,23 +25,31 @@ class VaultDirTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)
             source = base / "input"
+            cwd = base / "cwd"
             source.mkdir()
+            cwd.mkdir()
             (source / "id_rsa").write_text("secret\n", encoding="utf-8")
             nested = source / "subdir"
             nested.mkdir()
             (nested / "config").write_text("nested\n", encoding="utf-8")
 
-            vault_path = base / "input.vault"
+            vault_path = cwd / "input.vault"
 
-            with patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]):
+            with (
+                patch("main.Path.cwd", return_value=cwd),
+                patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]),
+            ):
                 encrypt_directory(source, vault_path, force=False)
 
             source.rename(base / "input.original")
 
-            with patch("main.getpass.getpass", return_value="testpass123"):
+            with (
+                patch("main.Path.cwd", return_value=cwd),
+                patch("main.getpass.getpass", return_value="testpass123"),
+            ):
                 output_dir = decrypt_vault(vault_path, None, force=False)
 
-            self.assertEqual(output_dir, base / "input")
+            self.assertEqual(output_dir, cwd / "input")
             self.assertEqual((output_dir / "id_rsa").read_text(encoding="utf-8"), "secret\n")
             self.assertEqual(
                 (output_dir / "subdir" / "config").read_text(encoding="utf-8"),
@@ -52,30 +60,38 @@ class VaultDirTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)
             source = base / "input"
+            cwd = base / "cwd"
             source.mkdir()
+            cwd.mkdir()
             (source / "file.txt").write_text("secret\n", encoding="utf-8")
 
             stdout = io.StringIO()
             with (
                 patch("sys.argv", ["vaultdir", str(source)]),
                 patch("sys.stdout", stdout),
+                patch("main.Path.cwd", return_value=cwd),
                 patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]),
             ):
                 exit_code = main()
 
             self.assertEqual(exit_code, 0)
-            self.assertTrue((base / "input.vault").is_file())
+            self.assertTrue((cwd / "input.vault").is_file())
             self.assertIn("Created", stdout.getvalue())
 
     def test_cli_decrypt_dispatches_from_file_source(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)
             source = base / "input"
+            cwd = base / "cwd"
             source.mkdir()
+            cwd.mkdir()
             (source / "file.txt").write_text("secret\n", encoding="utf-8")
-            vault_path = base / "input.vault"
+            vault_path = cwd / "input.vault"
 
-            with patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]):
+            with (
+                patch("main.Path.cwd", return_value=cwd),
+                patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]),
+            ):
                 encrypt_directory(source, vault_path, force=False)
 
             source.rename(base / "input.original")
@@ -84,12 +100,13 @@ class VaultDirTests(unittest.TestCase):
             with (
                 patch("sys.argv", ["vaultdir", str(vault_path)]),
                 patch("sys.stdout", stdout),
+                patch("main.Path.cwd", return_value=cwd),
                 patch("main.getpass.getpass", return_value="testpass123"),
             ):
                 exit_code = main()
 
             self.assertEqual(exit_code, 0)
-            self.assertTrue((base / "input").is_dir())
+            self.assertTrue((cwd / "input").is_dir())
             self.assertIn("Extracted to", stdout.getvalue())
 
     def test_cli_encrypt_ctrl_c_during_password_prompt_returns_clean_error(self) -> None:
@@ -150,19 +167,27 @@ class VaultDirTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)
             source = base / "input"
+            cwd = base / "cwd"
             source.mkdir()
+            cwd.mkdir()
             script = source / "script.sh"
             script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             os.chmod(script, 0o750)
 
-            vault_path = base / "input.vault"
+            vault_path = cwd / "input.vault"
 
-            with patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]):
+            with (
+                patch("main.Path.cwd", return_value=cwd),
+                patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]),
+            ):
                 encrypt_directory(source, vault_path, force=False)
 
             source.rename(base / "input.original")
 
-            with patch("main.getpass.getpass", return_value="testpass123"):
+            with (
+                patch("main.Path.cwd", return_value=cwd),
+                patch("main.getpass.getpass", return_value="testpass123"),
+            ):
                 restored = decrypt_vault(vault_path, None, force=False)
 
             self.assertEqual((restored / "script.sh").stat().st_mode & 0o777, 0o750)
@@ -171,20 +196,28 @@ class VaultDirTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)
             source = base / "input"
+            cwd = base / "cwd"
             source.mkdir()
+            cwd.mkdir()
             private_dir = source / "private"
             private_dir.mkdir()
             os.chmod(private_dir, 0o700)
             (private_dir / "secret.txt").write_text("secret\n", encoding="utf-8")
 
-            vault_path = base / "input.vault"
+            vault_path = cwd / "input.vault"
 
-            with patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]):
+            with (
+                patch("main.Path.cwd", return_value=cwd),
+                patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]),
+            ):
                 encrypt_directory(source, vault_path, force=False)
 
             source.rename(base / "input.original")
 
-            with patch("main.getpass.getpass", return_value="testpass123"):
+            with (
+                patch("main.Path.cwd", return_value=cwd),
+                patch("main.getpass.getpass", return_value="testpass123"),
+            ):
                 restored = decrypt_vault(vault_path, None, force=False)
 
             self.assertEqual((restored / "private").stat().st_mode & 0o777, 0o700)

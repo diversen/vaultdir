@@ -92,7 +92,7 @@ def prompt_password(confirm: bool) -> str:
 
 
 def default_encrypt_output(directory: Path) -> Path:
-    return directory.parent / f"{directory.name}.vault"
+    return Path.cwd() / f"{directory.name}.vault"
 
 
 def read_vault_header(vault_file: Path) -> tuple[int, int, int, bytes, bytes, int]:
@@ -217,7 +217,7 @@ def decrypt_vault(vault_file: Path, output_dir: Path | None, force: bool) -> Pat
         raise VaultDirError(f"not a file: {vault_file}")
     n, r, p, salt, nonce, ciphertext_length = read_vault_header(vault_file)
     password = prompt_password(confirm=False)
-    temp_parent = output_dir.parent if output_dir else vault_file.parent
+    temp_parent = output_dir.parent if output_dir else Path.cwd()
     temp_output = Path(
         tempfile.mkdtemp(prefix=f".{vault_file.stem}.tmp.", dir=str(temp_parent))
     )
@@ -239,7 +239,7 @@ def decrypt_vault(vault_file: Path, output_dir: Path | None, force: bool) -> Pat
             decryptor.finalize_with_tag(tag)
 
         extracted_root = temp_output / root_name
-        final_output = output_dir if output_dir else vault_file.parent / root_name
+        final_output = output_dir if output_dir else Path.cwd() / root_name
         ensure_output_path(final_output, force)
         extracted_root.replace(final_output)
         shutil.rmtree(temp_output)
