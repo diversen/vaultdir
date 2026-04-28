@@ -1,12 +1,25 @@
+import io
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from main import VaultDirError, decrypt_vault, encrypt_directory
+from main import VaultDirError, decrypt_vault, encrypt_directory, main
 
 
 class VaultDirTests(unittest.TestCase):
+    def test_version_flag_prints_project_version(self) -> None:
+        stdout = io.StringIO()
+        with (
+            patch("sys.argv", ["vaultdir", "--version"]),
+            patch("sys.stdout", stdout),
+        ):
+            with self.assertRaises(SystemExit) as exc:
+                main()
+
+        self.assertEqual(exc.exception.code, 0)
+        self.assertEqual(stdout.getvalue().strip(), "vaultdir 0.0.1")
+
     def test_encrypt_decrypt_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)

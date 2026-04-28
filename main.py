@@ -1,11 +1,13 @@
 import argparse
 import getpass
+import importlib.metadata
 import os
 import shutil
 import struct
 import sys
 import tarfile
 import tempfile
+import tomllib
 from pathlib import Path, PurePosixPath
 
 from cryptography.exceptions import InvalidTag
@@ -23,6 +25,8 @@ SCRYPT_N = 2**15
 SCRYPT_R = 8
 SCRYPT_P = 1
 HEADER_STRUCT = struct.Struct(">9sBIII")
+PROJECT_ROOT = Path(__file__).resolve().parent
+PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 
 
 class VaultDirError(Exception):
@@ -89,6 +93,17 @@ def default_decrypt_output(vault_file: Path) -> Path:
     if vault_file.suffix == ".vault":
         return vault_file.with_suffix("")
     return vault_file.parent / f"{vault_file.name}.out"
+
+
+def get_program_version() -> str:
+    try:
+        return importlib.metadata.version("vaultdir")
+    except importlib.metadata.PackageNotFoundError:
+        pass
+
+    with PYPROJECT_PATH.open("rb") as handle:
+        pyproject = tomllib.load(handle)
+    return pyproject["project"]["version"]
 
 
 def ensure_output_path(path: Path, force: bool) -> None:
@@ -225,6 +240,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="vaultdir",
         description="Encrypt or decrypt a directory into a password-protected vault file.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {get_program_version()}",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

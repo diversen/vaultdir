@@ -29,6 +29,7 @@ This restores `some-dir` in the current directory.
 ## Options
 
 ```bash
+vaultdir --version
 vaultdir encrypt some-dir -o backup.vault
 vaultdir decrypt backup.vault -o restored-dir
 vaultdir decrypt backup.vault -o restored-dir --force
