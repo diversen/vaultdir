@@ -8,6 +8,13 @@
 uv tool install git+https://github.com/diversen/vaultdir.git
 ```
 
+## Upgrade
+
+```bash
+uv tool install --upgrade git+https://github.com/diversen/vaultdir.git
+```
+
+
 ## Usage
 
 Encrypt a directory:
