@@ -1,0 +1,12 @@
+[project]
+name = "vaultdir"
+version = "0.1.0"
+description = "Encrypt and decrypt directories with a password"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography>=47.0.0",
+]
+
+[project.scripts]
+vaultdir = "main:main"

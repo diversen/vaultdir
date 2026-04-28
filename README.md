@@ -1,17 +1,41 @@
-# encrypt-dir
+# vaultdir
 
-This should be a simple tool written in Python that takes a single directory and encrypts it. The encryption should be password-based so there is no need to share keys.
+`vaultdir` encrypts a directory into a single password-protected `.vault` file and can decrypt it again later.
 
-Use case: I have made some new `ssh` keys on my work computer and I need to share them with my work laptop that is at home in a secure way.
+## Install
 
-The command should be named `vaultdir`.
+```bash
+uv tool install git+https://github.com/diversen/vaultdir.git
+```
 
-Usage should be something like:
+## Usage
 
-    vaultdir --encrypt some-dir
+Encrypt a directory:
 
-This encrypts the complete directory and all files into a single file, for example `some-dir.vault`.
+```bash
+vaultdir encrypt some-dir
+```
 
-    vaultdir --decrypt some-dir.vault
+This creates `some-dir.vault`.
 
-I enter the password and now have the decrypted original `some-dir`.
+Decrypt a vault:
+
+```bash
+vaultdir decrypt some-dir.vault
+```
+
+This restores `some-dir` in the current directory.
+
+## Options
+
+```bash
+vaultdir encrypt some-dir -o backup.vault
+vaultdir decrypt backup.vault -o restored-dir
+vaultdir decrypt backup.vault -o restored-dir --force
+```
+
+## Notes
+
+- The password is prompted interactively and is not passed on the command line.
+- Existing output files or directories are not overwritten unless `--force` is used.
+- The archive is encrypted with `scrypt` for key derivation and `AES-256-GCM` for authenticated encryption.

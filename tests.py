@@ -1,0 +1,57 @@
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from main import VaultDirError, decrypt_vault, encrypt_directory
+
+
+class VaultDirTests(unittest.TestCase):
+    def test_encrypt_decrypt_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source = base / "input"
+            source.mkdir()
+            (source / "id_rsa").write_text("secret\n", encoding="utf-8")
+            nested = source / "subdir"
+            nested.mkdir()
+            (nested / "config").write_text("nested\n", encoding="utf-8")
+
+            vault_path = base / "input.vault"
+            output_dir = base / "restored"
+
+            with patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]):
+                encrypt_directory(source, vault_path, force=False)
+
+            with patch("main.getpass.getpass", return_value="testpass123"):
+                decrypt_vault(vault_path, output_dir, force=False)
+
+            self.assertEqual(
+                (output_dir / "input" / "id_rsa").read_text(encoding="utf-8"),
+                "secret\n",
+            )
+            self.assertEqual(
+                (output_dir / "input" / "subdir" / "config").read_text(encoding="utf-8"),
+                "nested\n",
+            )
+
+    def test_wrong_password_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source = base / "input"
+            source.mkdir()
+            (source / "file.txt").write_text("secret\n", encoding="utf-8")
+
+            vault_path = base / "input.vault"
+            output_dir = base / "restored"
+
+            with patch("main.getpass.getpass", side_effect=["testpass123", "testpass123"]):
+                encrypt_directory(source, vault_path, force=False)
+
+            with patch("main.getpass.getpass", return_value="wrongpass"):
+                with self.assertRaises(VaultDirError):
+                    decrypt_vault(vault_path, output_dir, force=False)
+
+
+if __name__ == "__main__":
+    unittest.main()
