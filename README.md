@@ -5,13 +5,13 @@
 ## Install
 
 ```bash
-uv tool install git+https://github.com/diversen/vaultdir.git
+uv tool install vaultdir
 ```
 
 ## Upgrade
 
 ```bash
-uv tool install --upgrade git+https://github.com/diversen/vaultdir.git
+uv tool install --upgrade vaultdir
 ```
 
 ## Usage
