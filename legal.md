@@ -76,7 +76,7 @@ Practical takeaway:
 
 See also:
 
-- [docs.md](./docs.md)
+- [docs.md](https://github.com/diversen/vaultdir/blob/main/docs.md)
 
 ## Sources
 

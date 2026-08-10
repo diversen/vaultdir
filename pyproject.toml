@@ -8,5 +8,10 @@ dependencies = [
     "cryptography>=47.0.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/diversen/vaultdir"
+Documentation = "https://github.com/diversen/vaultdir/blob/main/docs.md"
+"Legal note" = "https://github.com/diversen/vaultdir/blob/main/legal.md"
+
 [project.scripts]
 vaultdir = "main:main"
