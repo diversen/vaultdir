@@ -10,8 +10,10 @@ uv tool install vaultdir
 
 ## Upgrade
 
+If `vaultdir` is already installed, upgrade it with:
+
 ```bash
-uv tool install --upgrade vaultdir
+uv tool upgrade vaultdir
 ```
 
 ## Usage
